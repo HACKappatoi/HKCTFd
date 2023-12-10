@@ -10,7 +10,12 @@ from CTFd.api.v1.schemas import (
     APIDetailedSuccessResponse,
     PaginatedAPIListSuccessResponse,
 )
-from CTFd.cache import clear_standings, clear_team_session, clear_user_session
+from CTFd.cache import (
+    clear_challenges,
+    clear_standings,
+    clear_team_session,
+    clear_user_session,
+)
 from CTFd.constants import RawEnum
 from CTFd.models import Awards, Submissions, Teams, Unlocks, Users, db
 from CTFd.schemas.awards import AwardSchema
@@ -18,6 +23,7 @@ from CTFd.schemas.submissions import SubmissionSchema
 from CTFd.schemas.teams import TeamSchema
 from CTFd.utils import get_config
 from CTFd.utils.decorators import admins_only, authed_only, require_team
+from CTFd.utils.decorators.modes import require_team_mode
 from CTFd.utils.decorators.visibility import (
     check_account_visibility,
     check_score_visibility,
@@ -50,6 +56,8 @@ teams_namespace.schema_model(
 
 @teams_namespace.route("")
 class TeamList(Resource):
+    method_decorators = [require_team_mode]
+
     @check_account_visibility
     @teams_namespace.doc(
         description="Endpoint to get Team objects in bulk",
@@ -76,6 +84,7 @@ class TeamList(Resource):
                         "country": "country",
                         "bracket": "bracket",
                         "affiliation": "affiliation",
+                        "email": "email",
                     },
                 ),
                 None,
@@ -86,6 +95,14 @@ class TeamList(Resource):
     def get(self, query_args):
         q = query_args.pop("q", None)
         field = str(query_args.pop("field", None))
+
+        if field == "email":
+            if is_admin() is False:
+                return {
+                    "success": False,
+                    "errors": {"field": "Emails can only be queried by admins"},
+                }, 400
+
         filters = build_model_filters(model=Teams, query=q, field=field)
 
         if is_admin() and request.args.get("view") == "admin":
@@ -152,6 +169,7 @@ class TeamList(Resource):
         db.session.close()
 
         clear_standings()
+        clear_challenges()
 
         return {"success": True, "data": response.data}
 
@@ -159,6 +177,8 @@ class TeamList(Resource):
 @teams_namespace.route("/<int:team_id>")
 @teams_namespace.param("team_id", "Team ID")
 class TeamPublic(Resource):
+    method_decorators = [require_team_mode]
+
     @check_account_visibility
     @teams_namespace.doc(
         description="Endpoint to get a specific Team object",
@@ -215,6 +235,7 @@ class TeamPublic(Resource):
 
         clear_team_session(team_id=team.id)
         clear_standings()
+        clear_challenges()
 
         db.session.close()
 
@@ -238,6 +259,7 @@ class TeamPublic(Resource):
 
         clear_team_session(team_id=team_id)
         clear_standings()
+        clear_challenges()
 
         db.session.close()
 
@@ -247,6 +269,8 @@ class TeamPublic(Resource):
 @teams_namespace.route("/me")
 @teams_namespace.param("team_id", "Current Team")
 class TeamPrivate(Resource):
+    method_decorators = [require_team_mode]
+
     @authed_only
     @require_team
     @teams_namespace.doc(
@@ -266,8 +290,11 @@ class TeamPrivate(Resource):
         if response.errors:
             return {"success": False, "errors": response.errors}, 400
 
+        # A team can always calculate their score regardless of any setting because they can simply sum all of their challenges
+        # Therefore a team requesting their private data should be able to get their own current score
+        # However place is not something that a team can ascertain on their own so it is always gated behind freeze time
         response.data["place"] = team.place
-        response.data["score"] = team.score
+        response.data["score"] = team.get_score(admin=True)
         return {"success": True, "data": response.data}
 
     @authed_only
@@ -368,6 +395,7 @@ class TeamPrivate(Resource):
 
         clear_team_session(team_id=team.id)
         clear_standings()
+        clear_challenges()
 
         db.session.close()
 
@@ -376,6 +404,8 @@ class TeamPrivate(Resource):
 
 @teams_namespace.route("/me/members")
 class TeamPrivateMembers(Resource):
+    method_decorators = [require_team_mode]
+
     @authed_only
     @require_team
     def post(self):
@@ -397,6 +427,8 @@ class TeamPrivateMembers(Resource):
 @teams_namespace.route("/<team_id>/members")
 @teams_namespace.param("team_id", "Team ID")
 class TeamMembers(Resource):
+    method_decorators = [require_team_mode]
+
     @admins_only
     def get(self, team_id):
         team = Teams.query.filter_by(id=team_id).first_or_404()
@@ -485,6 +517,8 @@ class TeamMembers(Resource):
 
 @teams_namespace.route("/me/solves")
 class TeamPrivateSolves(Resource):
+    method_decorators = [require_team_mode]
+
     @authed_only
     @require_team
     def get(self):
@@ -504,6 +538,8 @@ class TeamPrivateSolves(Resource):
 
 @teams_namespace.route("/me/fails")
 class TeamPrivateFails(Resource):
+    method_decorators = [require_team_mode]
+
     @authed_only
     @require_team
     def get(self):
@@ -532,6 +568,8 @@ class TeamPrivateFails(Resource):
 
 @teams_namespace.route("/me/awards")
 class TeamPrivateAwards(Resource):
+    method_decorators = [require_team_mode]
+
     @authed_only
     @require_team
     def get(self):
@@ -551,6 +589,8 @@ class TeamPrivateAwards(Resource):
 @teams_namespace.route("/<team_id>/solves")
 @teams_namespace.param("team_id", "Team ID")
 class TeamPublicSolves(Resource):
+    method_decorators = [require_team_mode]
+
     @check_account_visibility
     @check_score_visibility
     def get(self, team_id):
@@ -574,6 +614,8 @@ class TeamPublicSolves(Resource):
 @teams_namespace.route("/<team_id>/fails")
 @teams_namespace.param("team_id", "Team ID")
 class TeamPublicFails(Resource):
+    method_decorators = [require_team_mode]
+
     @check_account_visibility
     @check_score_visibility
     def get(self, team_id):
@@ -606,6 +648,8 @@ class TeamPublicFails(Resource):
 @teams_namespace.route("/<team_id>/awards")
 @teams_namespace.param("team_id", "Team ID")
 class TeamPublicAwards(Resource):
+    method_decorators = [require_team_mode]
+
     @check_account_visibility
     @check_score_visibility
     def get(self, team_id):

@@ -9,7 +9,7 @@ from CTFd.api.v1.schemas import (
     APIDetailedSuccessResponse,
     PaginatedAPIListSuccessResponse,
 )
-from CTFd.cache import clear_standings, clear_user_session
+from CTFd.cache import clear_challenges, clear_standings, clear_user_session
 from CTFd.constants import RawEnum
 from CTFd.models import (
     Awards,
@@ -87,6 +87,7 @@ class UserList(Resource):
                         "country": "country",
                         "bracket": "bracket",
                         "affiliation": "affiliation",
+                        "email": "email",
                     },
                 ),
                 None,
@@ -97,6 +98,14 @@ class UserList(Resource):
     def get(self, query_args):
         q = query_args.pop("q", None)
         field = str(query_args.pop("field", None))
+
+        if field == "email":
+            if is_admin() is False:
+                return {
+                    "success": False,
+                    "errors": {"field": "Emails can only be queried by admins"},
+                }, 400
+
         filters = build_model_filters(model=Users, query=q, field=field)
 
         if is_admin() and request.args.get("view") == "admin":
@@ -165,6 +174,7 @@ class UserList(Resource):
             user_created_notification(addr=email, name=name, password=password)
 
         clear_standings()
+        clear_challenges()
 
         response = schema.dump(response.data)
 
@@ -242,6 +252,7 @@ class UserPublic(Resource):
 
         clear_user_session(user_id=user_id)
         clear_standings()
+        clear_challenges()
 
         return {"success": True, "data": response.data}
 
@@ -270,6 +281,7 @@ class UserPublic(Resource):
 
         clear_user_session(user_id=user_id)
         clear_standings()
+        clear_challenges()
 
         return {"success": True}
 
@@ -290,8 +302,13 @@ class UserPrivate(Resource):
     def get(self):
         user = get_current_user()
         response = UserSchema("self").dump(user).data
+
+        # A user can always calculate their score regardless of any setting because they can simply sum all of their challenges
+        # Therefore a user requesting their private data should be able to get their own current score
+        # However place is not something that a user can ascertain on their own so it is always gated behind freeze time
         response["place"] = user.place
-        response["score"] = user.score
+        response["score"] = user.get_score(admin=True)
+
         return {"success": True, "data": response}
 
     @authed_only
@@ -322,6 +339,7 @@ class UserPrivate(Resource):
         db.session.close()
 
         clear_standings()
+        clear_challenges()
 
         return {"success": True, "data": response.data}
 

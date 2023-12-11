@@ -1,0 +1,3 @@
+[submodule "CTFd/themes/hackappa-theme"]
+	path = CTFd/themes/hackappa-theme
+	url = git@github.com:HACKappatoi/hackappa-theme.git

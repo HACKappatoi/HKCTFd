@@ -1,0 +1,13 @@
+{% extends "admin/challenges/update.html" %}
+
+{% block value %}
+<div class="form-group">
+	<label for="value">Author<br>
+		<small class="form-text text-muted">
+			This who has written the challenge.
+		</small>
+	</label>
+	<input type="text" class="form-control chal-value" name="author" value="{{ challenge.author }}" disabled>
+</div>
+
+{% endblock %}

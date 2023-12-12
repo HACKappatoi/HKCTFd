@@ -1,0 +1,23 @@
+{% extends "admin/challenges/create.html" %}
+
+{% block header %}
+<div class="alert alert-secondary" role="alert">
+	Standard with author
+</div>
+{% endblock %}
+
+
+{% block value %}
+<div class="form-group">
+	<label for="value">Author<br>
+		<small class="form-text text-muted">
+			This who has written the challenge.
+		</small>
+	</label>
+	<input type="text" class="form-control" name="author" placeholder="Enter author" required>
+</div>
+{% endblock %}
+
+{% block type %}
+<input type="hidden" value="authored" name="type" id="chaltype">
+{% endblock %}

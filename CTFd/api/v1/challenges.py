@@ -170,6 +170,9 @@ class ChallengeList(Resource):
             c.id for c in Challenges.query.with_entities(Challenges.id).all()
         }
         for challenge in chal_q:
+
+            # print('challenge id: 'challenge.id)
+            # print('challenge id: 'challenge.name)
             if challenge.requirements:
                 requirements = challenge.requirements.get("prerequisites", [])
                 anonymize = challenge.requirements.get("anonymize")
@@ -183,6 +186,7 @@ class ChallengeList(Resource):
                                 "id": challenge.id,
                                 "type": "hidden",
                                 "name": "???",
+                                "author": '???',
                                 "value": 0,
                                 "solves": None,
                                 "solved_by_me": False,
@@ -202,12 +206,17 @@ class ChallengeList(Resource):
                 continue
 
             # Challenge passes all checks, add it to response
+       
+            data = challenge_type.read(challenge)
+            print(data)
+            
             response.append(
                 {
                     "id": challenge.id,
                     "type": challenge_type.name,
                     "name": challenge.name,
                     "value": challenge.value,
+                    "author": data['author'] if 'author' in data else '---',
                     "solves": solve_counts.get(challenge.id, solve_count_dfl),
                     "solved_by_me": challenge.id in user_solves,
                     "category": challenge.category,
@@ -333,6 +342,7 @@ class Challenge(Resource):
                                 "id": chal.id,
                                 "type": "hidden",
                                 "name": "???",
+                                "author": '???',
                                 "value": 0,
                                 "solves": None,
                                 "solved_by_me": False,

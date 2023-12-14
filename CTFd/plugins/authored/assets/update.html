@@ -7,7 +7,7 @@
 			This who has written the challenge.
 		</small>
 	</label>
-	<input type="text" class="form-control chal-value" name="author" value="{{ challenge.author }}" disabled>
+	<input type="text" class="form-control chal-value" name="author" value="{{ challenge.author }}" required>
 </div>
 
 <div class="form-group">
@@ -16,7 +16,7 @@
 			This is how many points the challenge is worth.
 		</small>
 	</label>
-	<input type="number" class="form-control chal-value" name="value" value="{{ challenge.value }}" disabled>
+	<input type="number" class="form-control chal-value" name="value" value="{{ challenge.value }}" required>
 </div>
 
 {% endblock %}

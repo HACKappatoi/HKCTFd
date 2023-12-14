@@ -48,6 +48,9 @@ class BaseChallenge(object):
         :param challenge:
         :return: Challenge object, data dictionary to be returned to the user
         """
+
+        challenge = Challenges.query.filter_by(id=challenge.id).first()
+
         data = {
             "id": challenge.id,
             "name": challenge.name,
